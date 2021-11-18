@@ -1,4 +1,5 @@
 # System libs
+import json
 import os
 import argparse
 from distutils.version import LooseVersion
@@ -27,6 +28,49 @@ with open('data/object150_info.csv') as f:
         names[int(row[0])] = row[5].split(";")[0]
 
 
+# todo: move to arg parser
+FLAT_JSON_PATH = os.path.join("labels_perm", "old_cls_to_new_flat.json")
+OLD_CLS_TO_NEW_FLAT = json.load(open(FLAT_JSON_PATH))
+OLD_CLS_TO_NEW_FLAT = {eval(k): v for k, v in OLD_CLS_TO_NEW_FLAT.items()}
+
+ALLOWED_LABELS = set()
+IMG_IDS = set()
+for img_unique_id, old_label_id in OLD_CLS_TO_NEW_FLAT.keys():
+    IMG_IDS.add(img_unique_id.split("-")[1])
+    ALLOWED_LABELS.add(old_label_id)
+
+
+def replace_indices(arr, old_cls_to_new) -> "np.array":
+    new_arr = np.zeros_like(arr)
+
+    for i, val in enumerate(arr):
+        new_arr[i] = old_cls_to_new[val]
+
+
+def replace_labels_by_perm(label, img_name):
+    flatten_labels = label.flatten()
+    unique_labels = set(flatten_labels)
+
+    img_id_str = img_name.rsplit("_")[-1]
+    img_number = None
+    for img_id in IMG_IDS:
+        if img_id in img_id_str:
+            if img_number is None:
+                img_number = img_id
+            else:
+                raise NotImplementedError
+
+    unique_key = f"ade4test-{img_number}"
+
+    old_cls_to_new = {}
+    for cls in unique_labels:
+        old_cls_to_new[cls] = OLD_CLS_TO_NEW_FLAT[(unique_key, cls)]
+
+    new_label = replace_indices(flatten_labels, old_cls_to_new).reshape(label.shape)
+
+    return new_label
+
+
 def visualize_result(data, pred, cfg):
     (img, info) = data
 
@@ -41,15 +85,27 @@ def visualize_result(data, pred, cfg):
         if ratio > 0.1:
             print("  {}: {:.2f}%".format(name, ratio))
 
+    if not set(uniques).issubset(ALLOWED_LABELS):
+        print(f"labels mismatch, skipping {info}")
+        return
+
+    img_name = os.path.basename(info)
+
+    try:
+        pred = replace_labels_by_perm(pred, img_name)
+    except NotImplementedError:
+        return
+
     # colorize prediction
     pred_color = colorEncode(pred, colors).astype(np.uint8)
 
     # aggregate images and save
     im_vis = np.concatenate((img, pred_color), axis=1)
 
-    img_name = info.split('/')[-1]
     Image.fromarray(im_vis).save(
-        os.path.join(cfg.TEST.result, img_name.replace('.jpg', '.png')))
+        os.path.join(cfg.TEST.result, f"vis_{img_name.replace('.jpg', '.png')}"))
+    Image.fromarray(pred.astype(np.uint8)).save(os.path.join(cfg.TEST.result, img_name.replace('.jpg', '.png')))
+    Image.fromarray(data).save(os.path.join(cfg.TEST.result, img_name))
 
 
 def test(segmentation_module, loader, gpu):
@@ -196,3 +252,8 @@ if __name__ == '__main__':
         os.makedirs(cfg.TEST.result)
 
     main(cfg, args.gpu)
+
+
+"""
+python test.py --imgs <dir> TEST.result <target_dir> TEST.checkpoint epoch_20.pth
+"""
