@@ -94,6 +94,10 @@ def visualize_result(data, pred, cfg):
     try:
         pred = replace_labels_by_perm(pred, img_name)
     except NotImplementedError:
+        print(f"Got multiple name matches for {img_name} - Skipping")
+        return
+    except KeyError:
+        print(f"Got out of class prediction for {img_name} - Skipping")
         return
 
     # colorize prediction
