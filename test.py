@@ -73,7 +73,7 @@ def replace_labels_by_perm(label, img_name):
     return new_label
 
 
-def visualize_result(data, pred, cfg):
+def visualize_result(data, pred, cfg, img_id):
     (img, info) = data
 
     # print predictions in descending order
@@ -108,9 +108,10 @@ def visualize_result(data, pred, cfg):
     # aggregate images and save
     im_vis = np.concatenate((img, pred_color), axis=1)
 
-    Image.fromarray(im_vis).save(
-        os.path.join(cfg.TEST.result, f"vis_{img_name.replace('.jpg', '.png')}"))
-    Image.fromarray(pred.astype(np.uint8)).save(os.path.join(cfg.TEST.result, img_name.replace('.jpg', '.png')))
+    img_name = f"{img_id}_{img_name}"
+    pred_img_name = img_name.replace('.jpg', '.png')
+    Image.fromarray(im_vis).save(os.path.join(cfg.TEST.result, f"vis_{pred_img_name}"))
+    Image.fromarray(pred.astype(np.uint8)).save(os.path.join(cfg.TEST.result, pred_img_name))
     Image.fromarray(img).save(os.path.join(cfg.TEST.result, img_name))
 
 
@@ -118,7 +119,7 @@ def test(segmentation_module, loader, gpu):
     segmentation_module.eval()
 
     pbar = tqdm(total=len(loader))
-    for batch_data in loader:
+    for i, batch_data in enumerate(loader):
         # process data
         batch_data = batch_data[0]
         segSize = (batch_data['img_ori'].shape[0],
@@ -147,7 +148,8 @@ def test(segmentation_module, loader, gpu):
         visualize_result(
             (batch_data['img_ori'], batch_data['info']),
             pred,
-            cfg
+            cfg,
+            i,
         )
 
         pbar.update(1)
@@ -183,6 +185,8 @@ def main(cfg, gpu):
         collate_fn=user_scattered_collate,
         num_workers=5,
         drop_last=True)
+
+    assert cfg.TEST.batch_size == 1, "Batch size should be 1"
 
     segmentation_module.cuda()
 
