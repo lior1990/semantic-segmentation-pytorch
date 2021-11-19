@@ -111,7 +111,7 @@ def visualize_result(data, pred, cfg):
     Image.fromarray(im_vis).save(
         os.path.join(cfg.TEST.result, f"vis_{img_name.replace('.jpg', '.png')}"))
     Image.fromarray(pred.astype(np.uint8)).save(os.path.join(cfg.TEST.result, img_name.replace('.jpg', '.png')))
-    Image.fromarray(data).save(os.path.join(cfg.TEST.result, img_name))
+    Image.fromarray(img).save(os.path.join(cfg.TEST.result, img_name))
 
 
 def test(segmentation_module, loader, gpu):
