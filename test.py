@@ -46,6 +46,8 @@ def replace_indices(arr, old_cls_to_new) -> "np.array":
     for i, val in enumerate(arr):
         new_arr[i] = old_cls_to_new[val]
 
+    return new_arr
+
 
 def replace_labels_by_perm(label, img_name):
     flatten_labels = label.flatten()
